@@ -2,6 +2,8 @@ import requests
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, Integer, Text
+from concurrent.futures import ThreadPoolExecutor
+import os
 
 # API URLs for Uthmani and Simple text versions
 base_url_uthmani = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
@@ -31,12 +33,8 @@ class Ayah(Document):
         name = "quran_ayahs"
 
 
-# Create the index if it doesn't exist
-if not es.indices.exists(index=Ayah.Index.name):
-    Ayah.init(using=es)
-
-# Loop through all pages (604 pages in total)
-for page_number in range(1, 605):
+# Function to fetch and process ayahs for a specific page
+def process_page(page_number):
     url_uthmani = base_url_uthmani.format(page_number)
     url_simple = base_url_simple.format(page_number)
 
@@ -80,16 +78,24 @@ for page_number in range(1, 605):
             if bulk_data:
                 bulk(es, bulk_data, index=Ayah.Index.name)
                 print(f"Bulk inserted ayahs for page {page_number}.")
-
         else:
             print(f"Ayahs not found in page {page_number} data.")
-
     else:
         print(
-            f"Failed to fetch page {page_number}. "
-            f"Uthmani Status code: {response_uthmani.status_code}, "
-            f"Simple Status code: {response_simple.status_code}"
+            f"Failed to fetch page {page_number}. Uthmani Status code: {response_uthmani.status_code}, Simple Status code: {response_simple.status_code}"
         )
+
+
+# Create the index if it doesn't exist
+if not es.indices.exists(index=Ayah.Index.name):
+    Ayah.init(using=es)
+
+# Get the number of CPU cores on the system
+num_cores = os.cpu_count()
+
+# Use ThreadPoolExecutor to fetch and process pages in parallel
+with ThreadPoolExecutor(max_workers=num_cores) as executor:
+    executor.map(process_page, range(1, 605))
 
 print("Bulk indexing completed.")
 
