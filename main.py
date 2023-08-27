@@ -4,6 +4,7 @@ from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, Integer, Text
 from concurrent.futures import ThreadPoolExecutor
 import os
+import time
 
 # API URLs for Uthmani and Simple text versions
 base_url_uthmani = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
@@ -84,6 +85,8 @@ def process_page(page_number):
         print(
             f"Failed to fetch page {page_number}. Uthmani Status code: {response_uthmani.status_code}, Simple Status code: {response_simple.status_code}"
         )
+    # Introduce a delay between page requests to avoid rate limiting
+    time.sleep(1)  # Delay in seconds
 
 
 # Create the index if it doesn't exist
