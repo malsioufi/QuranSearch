@@ -1,6 +1,7 @@
 # This code was generated using ChatGPT3.5
 import requests
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, Integer, Text
 
 base_url_uthmani = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
@@ -33,6 +34,9 @@ class Ayah(Document):
 if not es.indices.exists(index=Ayah.Index.name):
     Ayah.init(using=es)
 
+# List to hold ayah documents for bulk indexing
+bulk_data = []
+
 # Loop through all pages (604 pages in total)
 for page_number in range(1, 605):
     url_uthmani = base_url_uthmani.format(page_number)
@@ -41,7 +45,10 @@ for page_number in range(1, 605):
     response_uthmani = requests.get(url_uthmani)
     response_simple = requests.get(url_simple)
 
-    if response_uthmani.status_code == 200 and response_simple.status_code == 200:
+    response_uthmani_ok = response_uthmani.status_code == 200
+    response_simple_ok = response_simple.status_code == 200
+
+    if response_uthmani_ok and response_simple_ok:
         page_data_uthmani = response_uthmani.json()["data"]
         page_data_simple = response_simple.json()["data"]
 
@@ -65,15 +72,22 @@ for page_number in range(1, 605):
                     surah_name=surah_name,
                 )
 
-                # Insert the ayah document into Elasticsearch
-                ayah_doc.save(using=es)
+                bulk_data.append(ayah_doc.to_dict(include_meta=True))
 
-            print(f"Inserted ayahs for page {page_number} into Elasticsearch.")
+            print(f"Processed ayahs for page {page_number}.")
 
         else:
             print(f"Ayahs not found in page {page_number} data.")
 
     else:
         print(
-            f"Failed to fetch page {page_number}. Uthmani Status code: {response_uthmani.status_code}, Simple Status code: {response_simple.status_code}"
+            f"Failed to fetch page {page_number}. "
+            f"Uthmani Status code: {response_uthmani.status_code}, "
+            f"Simple Status code: {response_simple.status_code}"
         )
+
+# Bulk insert all documents
+if bulk_data:
+    bulk(es, bulk_data, index=Ayah.Index.name)
+
+print("Bulk indexing completed.")
