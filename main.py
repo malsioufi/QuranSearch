@@ -34,9 +34,6 @@ class Ayah(Document):
 if not es.indices.exists(index=Ayah.Index.name):
     Ayah.init(using=es)
 
-# List to hold ayah documents for bulk indexing
-bulk_data = []
-
 # Loop through all pages (604 pages in total)
 for page_number in range(1, 605):
     url_uthmani = base_url_uthmani.format(page_number)
@@ -56,6 +53,8 @@ for page_number in range(1, 605):
             ayahs_uthmani = page_data_uthmani["ayahs"]
             ayahs_simple = page_data_simple["ayahs"]
 
+            bulk_data = []
+
             for ayah_uthmani, ayah_simple in zip(ayahs_uthmani, ayahs_simple):
                 ayah_number = int(ayah_uthmani["number"])
                 surah_number = int(ayah_uthmani["surah"]["number"])
@@ -74,7 +73,10 @@ for page_number in range(1, 605):
 
                 bulk_data.append(ayah_doc.to_dict(include_meta=True))
 
-            print(f"Processed ayahs for page {page_number}.")
+            # Bulk insert the documents for this page
+            if bulk_data:
+                bulk(es, bulk_data, index=Ayah.Index.name)
+                print(f"Bulk inserted ayahs for page {page_number}.")
 
         else:
             print(f"Ayahs not found in page {page_number} data.")
@@ -85,10 +87,6 @@ for page_number in range(1, 605):
             f"Uthmani Status code: {response_uthmani.status_code}, "
             f"Simple Status code: {response_simple.status_code}"
         )
-
-# Bulk insert all documents
-if bulk_data:
-    bulk(es, bulk_data, index=Ayah.Index.name)
 
 print("Bulk indexing completed.")
 
