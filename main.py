@@ -1,56 +1,59 @@
 # This code was generated using ChatGPT3.5
-
 import requests
 from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Document, Text
 
-# Fetch data from the APIs
-quran_simple_url = "http://api.alquran.cloud/v1/quran/quran-simple"
-quran_uthmani_url = "http://api.alquran.cloud/v1/quran/quran-uthmani"
+base_url = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
 
-response_simple = requests.get(quran_simple_url)
-response_uthmani = requests.get(quran_uthmani_url)
+# Define Elasticsearch connection
+es = Elasticsearch([{"host": "localhost", "port": 9200}])
 
-data_simple = response_simple.json()["data"]["surahs"]
-data_uthmani = response_uthmani.json()["data"]["surahs"]
 
-# Combine surahs and ayas
-combined_data = []
-for i in range(len(data_simple)):
-    surah = {
-        "number": data_simple[i]["number"],
-        "name": data_simple[i]["name"],
-        "revelation_type": data_simple[i]["revelation_type"],
-        "ayahs_simple": data_simple[i]["ayahs"],
-        "ayahs_uthmani": data_uthmani[i]["ayahs"]
-    }
-    combined_data.append(surah)
+# Define Elasticsearch index and mapping
+class Ayah(Document):
+    page_number = Text()
+    ayah_number = Text()
+    ayah_text = Text()
 
-# Connect to Elasticsearch
-es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+    class Index:
+        name = "quran_ayahs"
 
-# Index the combined data
-index_name = "quran_combined"
-index_settings = {
-    "settings": {
-        "number_of_shards": 1,
-        "number_of_replicas": 0
-    },
-    "mappings": {
-        "properties": {
-            "number": {"type": "integer"},
-            "name": {"type": "text"},
-            "revelation_type": {"type": "text"},
-            "ayahs_simple": {"type": "nested"},
-            "ayahs_uthmani": {"type": "nested"}
-        }
-    }
-}
 
-# Create the index with settings and mappings
-es.indices.create(index=index_name, body=index_settings)
+# Create the index if it doesn't exist
+if not es.indices.exists(index=Ayah.Index.name):
+    Ayah.init(using=es)
 
-# Index each surah
-for surah in combined_data:
-    es.index(index=index_name, body=surah)
+# Loop through all pages (604 pages in total)
+for page_number in range(1, 605):
+    url = base_url.format(page_number)
 
-print("Data indexed successfully.")
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        page_data = response.json()["data"]
+
+        if "ayahs" in page_data:
+            ayahs = page_data["ayahs"]
+
+            for ayah in ayahs:
+                ayah_text = ayah["text"]
+                ayah_number = ayah["number"]
+
+                ayah_doc = Ayah(
+                    page_number=page_number,
+                    ayah_number=ayah_number,
+                    ayah_text=ayah_text,
+                )
+
+                # Insert the ayah document into Elasticsearch
+                ayah_doc.save(using=es)
+
+            print(f"Inserted ayahs for page {page_number} into Elasticsearch.")
+
+        else:
+            print(f"Ayahs not found in page {page_number} data.")
+
+    else:
+        print(
+            f"Failed to fetch page {page_number}. Status code: {response.status_code}"
+        )
