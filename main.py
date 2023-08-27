@@ -1,7 +1,6 @@
-# This code was generated using ChatGPT3.5
 import requests
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Document, Text
+from elasticsearch_dsl import Document, Integer, Text
 
 base_url = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
 
@@ -17,10 +16,10 @@ es = Elasticsearch(
 
 # Define Elasticsearch index and mapping
 class Ayah(Document):
-    page_number = Text()
-    ayah_number = Text()
+    page_number = Integer()
+    ayah_number = Integer()
     ayah_text = Text()
-    surah_number = Text()
+    surah_number = Integer()
     surah_name = Text()
 
     class Index:
@@ -45,8 +44,8 @@ for page_number in range(1, 605):
 
             for ayah in ayahs:
                 ayah_text = ayah["text"]
-                ayah_number = ayah["number"]
-                surah_number = ayah["surah"]["number"]
+                ayah_number = int(ayah["number"])
+                surah_number = int(ayah["surah"]["number"])
                 surah_name = ayah["surah"]["name"]
 
                 ayah_doc = Ayah(
