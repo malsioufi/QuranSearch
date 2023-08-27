@@ -5,8 +5,14 @@ from elasticsearch_dsl import Document, Text
 
 base_url = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
 
-# Define Elasticsearch connection
-es = Elasticsearch([{"host": "localhost", "port": 9200}])
+# Elasticsearch authentication credentials
+es_username = "your_username"
+es_password = "your_password"
+
+# Define Elasticsearch connection with authentication
+es = Elasticsearch(
+    [{"host": "localhost", "port": 9200}], http_auth=(es_username, es_password)
+)
 
 
 # Define Elasticsearch index and mapping
@@ -14,6 +20,8 @@ class Ayah(Document):
     page_number = Text()
     ayah_number = Text()
     ayah_text = Text()
+    surah_number = Text()
+    surah_name = Text()
 
     class Index:
         name = "quran_ayahs"
@@ -38,11 +46,15 @@ for page_number in range(1, 605):
             for ayah in ayahs:
                 ayah_text = ayah["text"]
                 ayah_number = ayah["number"]
+                surah_number = ayah["surah"]["number"]
+                surah_name = ayah["surah"]["name"]
 
                 ayah_doc = Ayah(
                     page_number=page_number,
                     ayah_number=ayah_number,
                     ayah_text=ayah_text,
+                    surah_number=surah_number,
+                    surah_name=surah_name,
                 )
 
                 # Insert the ayah document into Elasticsearch
