@@ -1,9 +1,9 @@
-# This code was generated using ChatGPT3.5
 import requests
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
 from elasticsearch_dsl import Document, Integer, Text
 
+# API URLs for Uthmani and Simple text versions
 base_url_uthmani = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
 base_url_simple = "http://api.alquran.cloud/v1/page/{}/quran-simple"
 
@@ -91,3 +91,11 @@ if bulk_data:
     bulk(es, bulk_data, index=Ayah.Index.name)
 
 print("Bulk indexing completed.")
+
+# Credits to the API provider
+print("Data provided by AlQuran Cloud API (http://api.alquran.cloud)")
+
+# Credits to OpenAI assistant for code assistance and User for collaboration
+print(
+    "Code developed with assistance from OpenAI's GPT-3 assistant and in collaboration with Mohamad Alsioufi"
+)
