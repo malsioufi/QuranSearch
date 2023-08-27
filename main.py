@@ -20,10 +20,11 @@ es = Elasticsearch(
 # Define Elasticsearch index and mapping
 class Ayah(Document):
     page_number = Integer()
-    ayah_number = Integer()
+    ayah_number_in_quran = Integer()
     ayah_text_uthmani = Text(analyzer="arabic")
     ayah_text_simple = Text(analyzer="arabic")
     surah_number = Integer()
+    ayah_number_in_surah = Integer()
     surah_name = Text(analyzer="keyword")
 
     class Index:
@@ -56,18 +57,20 @@ for page_number in range(1, 605):
             bulk_data = []
 
             for ayah_uthmani, ayah_simple in zip(ayahs_uthmani, ayahs_simple):
-                ayah_number = int(ayah_uthmani["number"])
+                ayah_number_in_quran = int(ayah_uthmani["number"])
                 surah_number = int(ayah_uthmani["surah"]["number"])
+                ayah_number_in_surah = int(ayah_uthmani["numberInSurah"])
                 surah_name = ayah_uthmani["surah"]["name"]
                 ayah_text_uthmani = ayah_uthmani["text"]
                 ayah_text_simple = ayah_simple["text"]
 
                 ayah_doc = Ayah(
                     page_number=page_number,
-                    ayah_number=ayah_number,
+                    ayah_number_in_quran=ayah_number_in_quran,
                     ayah_text_uthmani=ayah_text_uthmani,
                     ayah_text_simple=ayah_text_simple,
                     surah_number=surah_number,
+                    ayah_number_in_surah=ayah_number_in_surah,
                     surah_name=surah_name,
                 )
 
