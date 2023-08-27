@@ -36,57 +36,66 @@ class Ayah(Document):
 
 # Function to fetch and process ayahs for a specific page
 def process_page(page_number):
-    url_uthmani = base_url_uthmani.format(page_number)
-    url_simple = base_url_simple.format(page_number)
+    max_retries = 3  # Maximum number of retries
+    retry_delay = 2  # Delay in seconds before retrying
 
-    response_uthmani = requests.get(url_uthmani)
-    response_simple = requests.get(url_simple)
+    for retry_attempt in range(max_retries):
+        url_uthmani = base_url_uthmani.format(page_number)
+        url_simple = base_url_simple.format(page_number)
 
-    response_uthmani_ok = response_uthmani.status_code == 200
-    response_simple_ok = response_simple.status_code == 200
+        response_uthmani = requests.get(url_uthmani)
+        response_simple = requests.get(url_simple)
 
-    if response_uthmani_ok and response_simple_ok:
-        page_data_uthmani = response_uthmani.json()["data"]
-        page_data_simple = response_simple.json()["data"]
+        response_uthmani_ok = response_uthmani.status_code == 200
+        response_simple_ok = response_simple.status_code == 200
 
-        if "ayahs" in page_data_uthmani and "ayahs" in page_data_simple:
-            ayahs_uthmani = page_data_uthmani["ayahs"]
-            ayahs_simple = page_data_simple["ayahs"]
+        if response_uthmani_ok and response_simple_ok:
+            page_data_uthmani = response_uthmani.json()["data"]
+            page_data_simple = response_simple.json()["data"]
 
-            bulk_data = []
+            if "ayahs" in page_data_uthmani and "ayahs" in page_data_simple:
+                ayahs_uthmani = page_data_uthmani["ayahs"]
+                ayahs_simple = page_data_simple["ayahs"]
 
-            for ayah_uthmani, ayah_simple in zip(ayahs_uthmani, ayahs_simple):
-                ayah_number_in_quran = int(ayah_uthmani["number"])
-                surah_number = int(ayah_uthmani["surah"]["number"])
-                ayah_number_in_surah = int(ayah_uthmani["numberInSurah"])
-                surah_name = ayah_uthmani["surah"]["name"]
-                ayah_text_uthmani = ayah_uthmani["text"]
-                ayah_text_simple = ayah_simple["text"]
+                bulk_data = []
 
-                ayah_doc = Ayah(
-                    page_number=page_number,
-                    ayah_number_in_quran=ayah_number_in_quran,
-                    ayah_text_uthmani=ayah_text_uthmani,
-                    ayah_text_simple=ayah_text_simple,
-                    surah_number=surah_number,
-                    ayah_number_in_surah=ayah_number_in_surah,
-                    surah_name=surah_name,
-                )
+                for ayah_uthmani, ayah_simple in zip(ayahs_uthmani, ayahs_simple):
+                    ayah_number_in_quran = int(ayah_uthmani["number"])
+                    surah_number = int(ayah_uthmani["surah"]["number"])
+                    ayah_number_in_surah = int(ayah_uthmani["numberInSurah"])
+                    surah_name = ayah_uthmani["surah"]["name"]
+                    ayah_text_uthmani = ayah_uthmani["text"]
+                    ayah_text_simple = ayah_simple["text"]
 
-                bulk_data.append(ayah_doc.to_dict(include_meta=True))
+                    ayah_doc = Ayah(
+                        page_number=page_number,
+                        ayah_number_in_quran=ayah_number_in_quran,
+                        ayah_text_uthmani=ayah_text_uthmani,
+                        ayah_text_simple=ayah_text_simple,
+                        surah_number=surah_number,
+                        ayah_number_in_surah=ayah_number_in_surah,
+                        surah_name=surah_name,
+                    )
 
-            # Bulk insert the documents for this page
-            if bulk_data:
-                bulk(es, bulk_data, index=Ayah.Index.name)
-                print(f"Bulk inserted ayahs for page {page_number}.")
+                    bulk_data.append(ayah_doc.to_dict(include_meta=True))
+
+                # Bulk insert the documents for this page
+                if bulk_data:
+                    bulk(es, bulk_data, index=Ayah.Index.name)
+                    print(f"Bulk inserted ayahs for page {page_number}.")
+                break  # Break the retry loop if successful
+            else:
+                print(f"Ayahs not found in page {page_number} data.")
+                break  # Break the retry loop if unsuccessful
         else:
-            print(f"Ayahs not found in page {page_number} data.")
-    else:
-        print(
-            f"Failed to fetch page {page_number}. Uthmani Status code: {response_uthmani.status_code}, Simple Status code: {response_simple.status_code}"
-        )
-    # Introduce a delay between page requests to avoid rate limiting
-    time.sleep(1)  # Delay in seconds
+            print(
+                f"Failed to fetch page {page_number} on attempt {retry_attempt+1}. "
+                f"Uthmani Status code: {response_uthmani.status_code}, "
+                f"Simple Status code: {response_simple.status_code}"
+            )
+            if retry_attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
 
 
 # Create the index if it doesn't exist
