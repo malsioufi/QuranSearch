@@ -1,3 +1,4 @@
+# This code was generated using ChatGPT3.5
 import requests
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Document, Integer, Text
@@ -19,10 +20,10 @@ es = Elasticsearch(
 class Ayah(Document):
     page_number = Integer()
     ayah_number = Integer()
-    ayah_text_uthmani = Text()
-    ayah_text_simple = Text()
+    ayah_text_uthmani = Text(analyzer="arabic")
+    ayah_text_simple = Text(analyzer="arabic")
     surah_number = Integer()
-    surah_name = Text()
+    surah_name = Text(analyzer="keyword")
 
     class Index:
         name = "quran_ayahs"
