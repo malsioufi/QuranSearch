@@ -1,5 +1,13 @@
 {
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    }
+        "diffEditor.ignoreTrimWhitespace": false,
+        "gitlens.codeLens.symbolScopes": [
+            "!Module"
+        ],
+        "editor.formatOnType": true,
+        "editor.wordBasedSuggestions": false,
+        "editor.inlineSuggest.enabled": true
+    },
+    "flake8.args": ["--max-line-length=150"]
+
 }
