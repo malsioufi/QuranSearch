@@ -1,11 +1,18 @@
 import requests
 from elasticsearch import Elasticsearch
-from elasticsearch.helpers import bulk
-from elasticsearch_dsl import Document, Integer, Text
+from elasticsearch_dsl import Document, Integer, Text, Boolean
 
-# API URLs for Uthmani and Simple text versions
-base_url_uthmani = "http://api.alquran.cloud/v1/page/{}/quran-uthmani"
-base_url_simple = "http://api.alquran.cloud/v1/page/{}/quran-simple"
+# Define the API URL to get the list of Arabic versions
+editions_url = "https://api.alquran.cloud/v1/edition?format=text&language=ar&type=quran"
+
+# Fetch the list of Arabic versions
+response = requests.get(editions_url)
+
+if response.status_code == 200:
+    arabic_versions = response.json()["data"]
+else:
+    print("Failed to fetch the list of Arabic versions.")
+    arabic_versions = []
 
 # Elasticsearch authentication credentials
 es_username = "your_username"
@@ -19,85 +26,74 @@ es = Elasticsearch(
 
 # Define Elasticsearch index and mapping
 class Ayah(Document):
-    page_number = Integer()
-    ayah_number_in_quran = Integer()
-    ayah_text_uthmani = Text(analyzer="arabic")
-    ayah_text_simple = Text(analyzer="arabic")
-    surah_number = Integer()
+    version = Text(analyzer="keyword")
+    ayah_text = Text(required=True)
     ayah_number_in_surah = Integer()
-    surah_name = Text(analyzer="keyword")
+    ayah_number_in_quran = Integer()
+    ayah_surah_name = Text(analyzer="keyword")
+    ayah_surah_number = Integer()
+    ayah_page_number = Integer()
+    ayah_ruku_number = Integer()
+    ayah_hizbQuarter_number = Integer()
+    ayah_is_sajda = Boolean()
 
-    class Index:
-        name = "quran_ayahs"
-
-
-# Delete the index if it exists
-if es.indices.exists(index=Ayah.Index.name):
-    es.indices.delete(index=Ayah.Index.name)
-    print(f"Deleted existing index: {Ayah.Index.name}")
-
-# Create the index
-Ayah.init(using=es)
-print(f"Created index: {Ayah.Index.name}")
+    @classmethod
+    def init(cls, index=None, using=None):
+        index_name = index or "quran_ayahs"
+        return super().init(index=index_name, using=using)
 
 
-# Function to fetch and process ayahs for a specific page
-def process_page(page_number):
-    url_uthmani = base_url_uthmani.format(page_number)
-    url_simple = base_url_simple.format(page_number)
-
-    response_uthmani = requests.get(url_uthmani)
-    response_simple = requests.get(url_simple)
-
-    response_uthmani_ok = response_uthmani.status_code == 200
-    response_simple_ok = response_simple.status_code == 200
-
-    if response_uthmani_ok and response_simple_ok:
-        page_data_uthmani = response_uthmani.json()["data"]
-        page_data_simple = response_simple.json()["data"]
-
-        if "ayahs" in page_data_uthmani and "ayahs" in page_data_simple:
-            ayahs_uthmani = page_data_uthmani["ayahs"]
-            ayahs_simple = page_data_simple["ayahs"]
-
-            bulk_data = []
-
-            for ayah_uthmani, ayah_simple in zip(ayahs_uthmani, ayahs_simple):
-                ayah_number_in_quran = int(ayah_uthmani["number"])
-                surah_number = int(ayah_uthmani["surah"]["number"])
-                ayah_number_in_surah = int(ayah_uthmani["numberInSurah"])
-                surah_name = ayah_uthmani["surah"]["name"]
-                ayah_text_uthmani = ayah_uthmani["text"]
-                ayah_text_simple = ayah_simple["text"]
-
-                ayah_doc = Ayah(
-                    page_number=page_number,
-                    ayah_number_in_quran=ayah_number_in_quran,
-                    ayah_text_uthmani=ayah_text_uthmani,
-                    ayah_text_simple=ayah_text_simple,
-                    surah_number=surah_number,
-                    ayah_number_in_surah=ayah_number_in_surah,
-                    surah_name=surah_name,
+# Function to fetch and process ayahs for a specific Arabic version
+def process_arabic_version(version):
+    # Delete the index if it exists
+    index_name = f"ayahs_in_{version['identifier']}"
+    if es.indices.exists(index=index_name):
+        es.indices.delete(index=index_name)
+        print(f"Deleted existing index: {index_name}")
+    # Create the index
+    Ayah.init(using=es, index=index_name)
+    print(f"Created index: {index_name}")
+    print(f"\t\t{version['identifier']}")
+    base_url = f"http://api.alquran.cloud/v1/page/{{}}/{version['identifier']}"
+    for page_number in range(1, 605):
+        print(f"\t\t\tPage: {page_number}")
+        url = base_url.format(page_number)
+        response = requests.get(url)
+        if response.status_code == 200:
+            page_data = response.json()["data"]
+            ayahs = page_data.get("ayahs")
+            if ayahs:
+                for ayah in ayahs:
+                    ayah_number_in_quran = int(ayah["number"])
+                    ayah_doc = Ayah(
+                        version=version,
+                        ayah_text=ayah["text"],
+                        ayah_number_in_surah=int(ayah["numberInSurah"]),
+                        ayah_number_in_quran=ayah_number_in_quran,
+                        ayah_surah_name=ayah["surah"]["name"],
+                        ayah_surah_number=int(ayah["surah"]["number"]),
+                        ayah_page_number=int(ayah["page"]),
+                        ayah_ruku_number=int(ayah["ruku"]),
+                        ayah_hizbQuarter_number=int(ayah["hizbQuarter"]),
+                        ayah_is_sajda=ayah["sajda"],
+                    )
+                    ayah_doc.meta.id = f"{ayah_number_in_quran}"
+                    ayah_doc.save()
+            else:
+                print(
+                    f"Ayahs not found in {version['identifier']}, page {page_number} data."
                 )
-
-                bulk_data.append(ayah_doc.to_dict(include_meta=True))
-
-            # Bulk insert the documents for this page
-            if bulk_data:
-                bulk(es, bulk_data, index=Ayah.Index.name)
-                print(f"Bulk inserted ayahs for page {page_number}.")
+                print(f"URL: {url}")
         else:
-            print(f"Ayahs not found in page {page_number} data.")
-    else:
-        print(
-            f"Failed to fetch page {page_number}. Uthmani Status code: {response_uthmani.status_code}, "
-            f"Simple Status code: {response_simple.status_code}"
-        )
+            print(
+                f"Failed to fetch page {page_number} for {version['identifier']}. Status code: {response.status_code}"
+            )
+            print(f"URL: {url}")
 
 
-# Fetch and process ayahs for each page
-for page_number in range(1, 605):
-    process_page(page_number)
+# Fetch and process ayahs for each Arabic version
+for version in arabic_versions:
+    process_arabic_version(version)
 
 print("Data retrieval and indexing completed.")
 
