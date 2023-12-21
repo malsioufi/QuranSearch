@@ -4,7 +4,7 @@ from elasticsearch_dsl import Document, Integer, Text, Boolean
 import logging
 from config import ELASTICSEARCH_HOST, ELASTICSEARCH_PORT, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD, INDEX_PREFIX, MAX_PAGES, EDITIONS_URL
 from logger import configure_logger
-
+from api import fetch_arabic_versions
 
 logger = configure_logger()
 
@@ -32,15 +32,6 @@ class Ayah(Document):
     def init(cls, index=None, using=None):
         index_name = index or "quran_ayahs"
         return super().init(index=index_name, using=using)
-
-
-def fetch_arabic_versions():
-    response = requests.get(EDITIONS_URL)
-    if response.status_code == 200:
-        return response.json().get("data", [])
-    else:
-        logger.error("Failed to fetch the list of Arabic versions.")
-        return []
 
 
 def configure_logger():
