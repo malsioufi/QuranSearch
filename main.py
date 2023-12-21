@@ -2,6 +2,7 @@ import requests
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Document, Integer, Text, Boolean
 import logging
+from config import ELASTICSEARCH_HOST, ELASTICSEARCH_PORT, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD, INDEX_PREFIX, MAX_PAGES, EDITIONS_URL
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,16 +15,9 @@ file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
-# User-defined constants
-ELASTICSEARCH_HOST = "localhost"
-ELASTICSEARCH_PORT = 9200
-ELASTICSEARCH_USERNAME = "your_username"
-ELASTICSEARCH_PASSWORD = "your_password"
-INDEX_PREFIX = "ayahs_in_"
-MAX_PAGES = 605
 
-# Define the API URL to get the list of Arabic versions
-EDITIONS_URL = "https://api.alquran.cloud/v1/edition?format=text&language=ar&type=quran"
+
+
 
 # Define Elasticsearch connection with authentication
 ES = Elasticsearch(
