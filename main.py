@@ -3,21 +3,10 @@ from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Document, Integer, Text, Boolean
 import logging
 from config import ELASTICSEARCH_HOST, ELASTICSEARCH_PORT, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD, INDEX_PREFIX, MAX_PAGES, EDITIONS_URL
-
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Configure a file handler for the logger
-file_handler = logging.FileHandler('app_log.log')
-file_handler.setLevel(logging.ERROR)  # Log only errors to the file
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
+from logger import configure_logger
 
 
-
-
+logger = configure_logger()
 
 # Define Elasticsearch connection with authentication
 ES = Elasticsearch(
