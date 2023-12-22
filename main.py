@@ -1,7 +1,7 @@
 import requests
 from config import INDEX_PREFIX, MAX_PAGES
 from logger import logger
-from api import fetch_arabic_editions
+from quran_api import fetch_arabic_editions
 from elasticsearch_service import configure_elasticsearch, Ayah
 
 
