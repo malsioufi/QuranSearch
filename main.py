@@ -1,22 +1,22 @@
 import requests
 from config import INDEX_PREFIX, MAX_PAGES
 from logger import configure_logger
-from api import fetch_arabic_versions
+from api import fetch_arabic_editions
 from elasticsearch_service import configure_elasticsearch, Ayah
 
 logger = configure_logger()
 
 
-def process_arabic_version(version, es):
+def process_arabic_edition(edition, es):
     try:
-        index_name = INDEX_PREFIX + version["identifier"]
+        index_name = INDEX_PREFIX + edition["identifier"]
         if es.indices.exists(index=index_name):
             es.indices.delete(index=index_name)
             logger.info(f"Deleted existing index: {index_name}")
         Ayah.init(using=es, index=index_name)
         logger.info(f"Created index: {index_name}")
 
-        base_url = f"http://api.alquran.cloud/v1/page/{{}}/{version['identifier']}"
+        base_url = f"http://api.alquran.cloud/v1/page/{{}}/{edition['identifier']}"
         for page_number in range(1, MAX_PAGES + 1):
             url = base_url.format(page_number)
             response = requests.get(url)
@@ -33,7 +33,7 @@ def process_arabic_version(version, es):
                             "_type": "_doc",
                             "_id": str(ayah["number"]),  # Document ID
                             "_source": {
-                                "version": version,
+                                "version": edition,
                                 "ayah_text": ayah["text"],
                                 "ayah_number_in_surah": int(ayah["numberInSurah"]),
                                 "ayah_number_in_quran": int(ayah["number"]),
@@ -52,17 +52,17 @@ def process_arabic_version(version, es):
                     es.bulk(body=bulk_data)  # The bulk API request
                 else:
                     logger.warning(
-                        f"Ayahs not found in {version['identifier']}, page {page_number} data."
+                        f"Ayahs not found in {edition['identifier']}, page {page_number} data."
                     )
                     logger.info(f"URL: {url}")
             else:
                 logger.error(
-                    f"Failed to fetch page {page_number} for {version['identifier']}. Status code: {response.status_code}"
+                    f"Failed to fetch page {page_number} for {edition['identifier']}. Status code: {response.status_code}"
                 )
                 logger.info(f"URL: {url}")
                 # Log the problematic URL to the file for later retry
                 file_handler.error(
-                    f"Failed to fetch page {page_number} for {version['identifier']}. Status code: {response.status_code}. URL: {url}"
+                    f"Failed to fetch page {page_number} for {edition['identifier']}. Status code: {response.status_code}. URL: {url}"
                 )
     except Exception as e:
         logger.exception(f"An error occurred: {str(e)}")
@@ -72,13 +72,13 @@ def main():
     logger = configure_logger()
     es = configure_elasticsearch()
 
-    arabic_versions = fetch_arabic_versions()
-    if not arabic_versions:
+    arabic_editions = fetch_arabic_editions(logger)
+    if not arabic_editions:
         logger.error("No Arabic versions found. Exiting.")
         return
 
-    for version in arabic_versions:
-        process_arabic_version(version, es)
+    for edition in arabic_editions:
+        process_arabic_edition(edition, es)
 
     logger.info("Data retrieval and indexing completed.")
     logger.info("Data provided by AlQuran Cloud API (http://api.alquran.cloud)")

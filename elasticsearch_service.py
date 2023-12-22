@@ -6,7 +6,7 @@ from config import ELASTICSEARCH_HOST, ELASTICSEARCH_PORT, ELASTICSEARCH_USERNAM
 
 # Define Elasticsearch index and mapping
 class Ayah(Document):
-    version = Text(analyzer="keyword")
+    edition = Text(analyzer="keyword")
     ayah_text = Text(required=True)
     ayah_number_in_surah = Integer()
     ayah_number_in_quran = Integer()

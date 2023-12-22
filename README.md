@@ -4,7 +4,7 @@ This project retrieves Quranic ayahs from the AlQuran Cloud API, indexes them in
 
 ## Features
 
-- Retrieves Quranic ayahs from AlQuran Cloud API for both Uthmani and Simple text versions.
+- Retrieves Quranic ayahs from AlQuran Cloud API for both all available editions.
 - Indexes ayahs in an Elasticsearch database with proper mappings for effective searching.
 - Provides an example of handling API rate limits and best practices for data retrieval.
 - Supports customization of Elasticsearch credentials and connection settings.
