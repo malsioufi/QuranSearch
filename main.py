@@ -1,10 +1,8 @@
 import requests
 from config import INDEX_PREFIX, MAX_PAGES
-from logger import configure_logger
+from logger import logger
 from api import fetch_arabic_editions
 from elasticsearch_service import configure_elasticsearch, Ayah
-
-logger = configure_logger()
 
 
 def process_arabic_edition(edition, es):
@@ -61,7 +59,7 @@ def process_arabic_edition(edition, es):
                 )
                 logger.info(f"URL: {url}")
                 # Log the problematic URL to the file for later retry
-                file_handler.error(
+                logger.error(
                     f"Failed to fetch page {page_number} for {edition['identifier']}. Status code: {response.status_code}. URL: {url}"
                 )
     except Exception as e:
@@ -69,10 +67,10 @@ def process_arabic_edition(edition, es):
 
 
 def main():
-    logger = configure_logger()
     es = configure_elasticsearch()
 
-    arabic_editions = fetch_arabic_editions(logger)
+    arabic_editions = fetch_arabic_editions()
+
     if not arabic_editions:
         logger.error("No Arabic versions found. Exiting.")
         return

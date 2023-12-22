@@ -1,7 +1,13 @@
 # elasticsearch_service.py
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Document, Integer, Text, Boolean
-from config import ELASTICSEARCH_HOST, ELASTICSEARCH_PORT, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD
+from config import (
+    ELASTICSEARCH_HOST,
+    ELASTICSEARCH_PORT,
+    ELASTICSEARCH_USERNAME,
+    ELASTICSEARCH_PASSWORD,
+)
+from logger import logger
 
 
 # Define Elasticsearch index and mapping
@@ -19,6 +25,7 @@ class Ayah(Document):
 
     @classmethod
     def init(cls, index=None, using=None):
+        logger.info(f"Creating index: {index or 'quran_ayahs'}")
         index_name = index or "quran_ayahs"
         return super().init(index=index_name, using=using)
 
