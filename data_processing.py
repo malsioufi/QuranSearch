@@ -1,9 +1,11 @@
+import re
 import requests
 from config import INDEX_PREFIX, NUMBER_OF_PAGES_IN_QURAN
 from elasticsearch_service import Ayah, configure_elasticsearch
 from elasticsearch.helpers import bulk, BulkIndexError
 
 from logger import logger
+from quran_api import fetch_arabic_editions
 
 
 def create_index(index_name, es):
@@ -29,24 +31,23 @@ def get_and_index_edition_data(edition, es, index_name):
     for page_number in range(1, NUMBER_OF_PAGES_IN_QURAN + 1):
         url = base_url.format(page_number)
         try:
-            get_and_index_page_data(edition=edition, es=es, index_name=index_name, url=url)
+            get_and_index_page_data_from_url(
+                edition=edition, es=es, index_name=index_name, url=url
+            )
         except BulkIndexError as err:
             handle_error(message="Error during bulk indexing", url=url, error=err)
         except Exception:
             handle_error(message="Failed to fetch page", url=url)
 
 
-def get_and_index_page_data(edition, es, index_name, url):
+def get_and_index_page_data_from_url(edition, es, index_name, url):
     response = requests.get(url)
     if response.status_code == 200:
         ayahs = response.json().get("data", {}).get("ayahs", [])
         if ayahs:
             try:
                 failed = index_ayahs(
-                    ayahs=ayahs,
-                    edition=edition,
-                    es=es,
-                    index_name=index_name
+                    ayahs=ayahs, edition=edition, es=es, index_name=index_name
                 )
                 if failed:
                     # Log details of failed documents
@@ -63,7 +64,9 @@ def get_and_index_page_data(edition, es, index_name, url):
 def index_ayahs(ayahs, edition, es, index_name):
     bulk_data = []
     for ayah in ayahs:
-        bulk_data.append(prepare_ayah_document(edition=edition, index_name=index_name, ayah=ayah))
+        bulk_data.append(
+            prepare_ayah_document(edition=edition, index_name=index_name, ayah=ayah)
+        )
     try:
         # Use the bulk helper to perform bulk insertion
         _, failed = bulk(es, bulk_data, raise_on_error=False)
@@ -102,7 +105,7 @@ def handle_error(message, url, error: None):
     logger.info(url)
 
 
-def process_edition(edition, es):
+def process_edition(edition):
     """
     Process Arabic edition including index management, data retrieval, and processing.
     """
@@ -121,3 +124,44 @@ def process_edition(edition, es):
             url=f"index_name:{index_name}",
             error=err,
         )
+
+
+def rerun_failed_links(links_list_path):
+    with open(links_list_path, "r") as links_file:
+        links_content = links_file.readlines()
+
+    # Extract URLs using a regular expression
+    url_pattern = re.compile(r"http://api.alquran.cloud/v1/page/\d+/([a-zA-Z0-9_-]+)")
+    urls_and_editions_to_reprocess = [
+        {
+            "url": url_pattern.search(line).group(),
+            "edition": url_pattern.search(line).group(1),
+        }
+        for line in links_content
+        if url_pattern.search(line)
+    ]
+
+    arabic_editions = fetch_arabic_editions()
+    editions = [
+        {
+            "identifier": edition["identifier"],
+            "name": edition["name"],
+        }
+        for edition in arabic_editions
+    ]
+
+    es = configure_elasticsearch()
+
+    for url_and_edition in urls_and_editions_to_reprocess:
+        edition_identifier = url_and_edition["edition"]
+        url = url_and_edition["url"]
+        edition = next(
+            (
+                edition
+                for edition in editions
+                if edition["identifier"] == edition_identifier
+            ),
+            None,
+        )
+        index_name = INDEX_PREFIX + edition_identifier
+        get_and_index_page_data_from_url(edition, es, index_name, url)

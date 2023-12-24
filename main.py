@@ -1,6 +1,6 @@
 import argparse
 import sys
-from data_processing import process_edition
+from data_processing import process_edition, rerun_failed_links
 from logger import logger
 from quran_api import fetch_arabic_editions
 
@@ -22,7 +22,7 @@ def main():
 
     if args.rerun:
         # Rerun mode
-        # rerun_failed_links(args.links_list)
+        rerun_failed_links(args.links_list)
         pass
 
     else:
