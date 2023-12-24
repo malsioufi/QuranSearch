@@ -1,6 +1,6 @@
 # elasticsearch_service.py
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Document, Integer, Object, Text, Boolean
+from elasticsearch_dsl import Document, Integer, Keyword, Object, Text, Boolean
 from config import (
     ELASTICSEARCH_HOST,
     ELASTICSEARCH_PORT,
@@ -12,10 +12,10 @@ from logger import logger
 
 # Define Elasticsearch index and mapping
 class Ayah(Document):
-    edition_identifier = Text(analyzer="keyword")
-    edition_name_in_arabic = Text(analyzer="keyword")
+    edition_identifier = Keyword()
+    edition_name_in_arabic = Keyword()
     ayah_text = Text(analyzer="arabic", required=True)
-    ayah_surah_name = Text(analyzer="keyword")
+    ayah_surah_name = Keyword()
 
     ayah_number_in_surah = Integer()
     ayah_number_in_quran = Integer()
