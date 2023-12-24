@@ -1,6 +1,7 @@
 import requests
 from config import INDEX_PREFIX, MAX_PAGES
 from elasticsearch_service import Ayah
+from elasticsearch.helpers import bulk, BulkIndexError
 
 from logger import logger
 
@@ -42,7 +43,9 @@ def fetch_and_process_data(edition, es, index_name):
                 url,
             )
         else:
-            handle_error(response.status_code, edition, page_number, url)
+            handle_error(
+                "Failed to fetch page", response.status_code, edition, page_number, url
+            )
 
 
 def process_page_data(page_data, edition, es, index_name, page_number, url):
@@ -50,42 +53,52 @@ def process_page_data(page_data, edition, es, index_name, page_number, url):
     Process data from a page and index it.
     """
     ayahs = page_data.get("ayahs", [])
-
     if ayahs:
-        bulk_data = [
-            {
-                "_op_type": "index",  # Action: Index a document
-                "_index": index_name,  # Index name
-                "_type": "_doc",
-                "_id": str(ayah["number"]),  # Document ID
-                "_source": {
-                    "version": edition,
-                    "ayah_text": ayah["text"],
-                    # ... (other fields)
-                },
-            }
-            for ayah in ayahs
-        ]
-        es.bulk(body=bulk_data)
+        bulk_data = []
+        for ayah in ayahs:
+            bulk_data.append(
+                {
+                    "_op_type": "index",
+                    "_index": index_name,
+                    "_id": str(ayah["number"]),
+                    "_source": {
+                        "edition_identifier": edition["identifier"],
+                        "edition_name_in_arabic": edition["name"],
+                        "ayah_text": ayah["text"],
+                        "ayah_number_in_surah": int(ayah["numberInSurah"]),
+                        "ayah_number_in_quran": int(ayah["number"]),
+                        "ayah_surah_name": ayah["surah"]["name"],
+                        "ayah_surah_number": int(ayah["surah"]["number"]),
+                        "ayah_page_number": int(ayah["page"]),
+                        "ayah_ruku_number": int(ayah["ruku"]),
+                        "ayah_hizbQuarter_number": int(ayah["hizbQuarter"]),
+                        "ayah_is_sajda": ayah["sajda"],
+                    },
+                }
+            )
+
+        try:
+            # Use the bulk helper to perform bulk insertion
+            _, failed = bulk(es, bulk_data, raise_on_error=False)
+            if failed:
+                # Log details of failed documents
+                for doc in failed:
+                    handle_error("Failed to index", 500, edition, page_number, url)
+        except BulkIndexError:
+            # Log the overall bulk indexing error
+            handle_error("Error during bulk indexing", 500, edition, page_number, url)
     else:
-        logger.warning(
-            f"Ayahs not found in {edition['identifier']}, page {page_number} data."
-        )
-        logger.info(f"URL: {url}")
+        handle_error("Ayahs not found", 404, edition, page_number, url)
 
 
-def handle_error(status_code, edition, page_number, url):
+def handle_error(message, status_code, edition, page_number, url):
     """
     Handle errors during data fetching.
     """
     logger.error(
-        f"Failed to fetch page {page_number} for {edition['identifier']}. Status code: {status_code}"
+        f"{message} {page_number} for {edition['identifier']}. Status code: {status_code}"
     )
-    logger.info(f"URL: {url}")
-    # Log the problematic URL to the file for later retry
-    logger.error(
-        f"Failed to fetch page {page_number} for {edition['identifier']}. Status code: {status_code}. URL: {url}"
-    )
+    logger.info(url)
 
 
 def process_arabic_edition(edition, es):
@@ -102,3 +115,4 @@ def process_arabic_edition(edition, es):
 
     except Exception as e:
         logger.exception(f"An error occurred: {str(e)}")
+        handle_error("An error occurred in process_arabic_edition", 500, edition, 0, f"index_name:{index_name}")

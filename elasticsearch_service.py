@@ -12,15 +12,18 @@ from logger import logger
 
 # Define Elasticsearch index and mapping
 class Ayah(Document):
-    edition = Text(analyzer="keyword")
-    ayah_text = Text(required=True)
+    edition_identifier = Text(analyzer="keyword")
+    edition_name_in_arabic = Text(analyzer="keyword")
+    ayah_text = Text(analyzer="arabic", required=True)
+    ayah_surah_name = Text(analyzer="keyword")
+
     ayah_number_in_surah = Integer()
     ayah_number_in_quran = Integer()
-    ayah_surah_name = Text(analyzer="keyword")
     ayah_surah_number = Integer()
     ayah_page_number = Integer()
     ayah_ruku_number = Integer()
     ayah_hizbQuarter_number = Integer()
+
     ayah_is_sajda = Boolean()
 
     @classmethod
@@ -32,6 +35,6 @@ class Ayah(Document):
 
 def configure_elasticsearch():
     return Elasticsearch(
-        [{"host": ELASTICSEARCH_HOST, "port": ELASTICSEARCH_PORT}],
+        [{"host": ELASTICSEARCH_HOST, "port": ELASTICSEARCH_PORT, "scheme": "http"}],
         http_auth=(ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD),
     )
