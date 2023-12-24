@@ -1,6 +1,6 @@
 # elasticsearch_service.py
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Document, Integer, Text, Boolean
+from elasticsearch_dsl import Document, Integer, Object, Text, Boolean
 from config import (
     ELASTICSEARCH_HOST,
     ELASTICSEARCH_PORT,
@@ -24,7 +24,10 @@ class Ayah(Document):
     ayah_ruku_number = Integer()
     ayah_hizbQuarter_number = Integer()
 
-    ayah_is_sajda = Boolean()
+    ayah_is_sajda = Object(
+        properties={"id": Integer(), "recommended": Boolean(), "obligatory": Boolean()},
+        enabled=False,
+    )
 
     @classmethod
     def init(cls, index=None, using=None):
