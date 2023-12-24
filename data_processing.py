@@ -24,76 +24,73 @@ def delete_existing_index(index_name, es):
 
 
 def get_and_index_edition_data(edition, es, index_name):
-    """
-    Fetch data from the Quran API and index it.
-    """
     base_url = f"http://api.alquran.cloud/v1/page/{{}}/{edition['identifier']}"
 
     for page_number in range(1, NUMBER_OF_PAGES_IN_QURAN + 1):
         url = base_url.format(page_number)
         try:
-            get_and_index_page_data(edition, es, index_name, page_number, url)
+            get_and_index_page_data(edition=edition, es=es, index_name=index_name, url=url)
         except BulkIndexError as err:
             handle_error(message="Error during bulk indexing", url=url, error=err)
         except Exception:
             handle_error(message="Failed to fetch page", url=url)
 
 
-def get_and_index_page_data(edition, es, index_name, page_number, url):
+def get_and_index_page_data(edition, es, index_name, url):
     response = requests.get(url)
     if response.status_code == 200:
         ayahs = response.json().get("data", {}).get("ayahs", [])
         if ayahs:
-            index_ayahs(
-                ayahs,
-                edition,
-                es,
-                index_name,
-                page_number,
-                url,
-            )
+            try:
+                failed = index_ayahs(
+                    ayahs=ayahs,
+                    edition=edition,
+                    es=es,
+                    index_name=index_name
+                )
+                if failed:
+                    # Log details of failed documents
+                    for _ in failed:
+                        handle_error(message="Failed to index", url=url)
+            except BulkIndexError as err:
+                raise err
         else:
             handle_error(message="Ayahs not found", url=url)
     else:
         raise Exception
 
 
-def index_ayahs(ayahs, edition, es, index_name, page_number, url):
-    """
-    Index data from a page.
-    """
+def index_ayahs(ayahs, edition, es, index_name):
     bulk_data = []
     for ayah in ayahs:
-        bulk_data.append(
-            {
-                "_op_type": "index",
-                "_index": index_name,
-                "_id": str(ayah["number"]),
-                "_source": {
-                    "edition_identifier": edition["identifier"],
-                    "edition_name_in_arabic": edition["name"],
-                    "ayah_text": ayah["text"],
-                    "ayah_number_in_surah": int(ayah["numberInSurah"]),
-                    "ayah_number_in_quran": int(ayah["number"]),
-                    "ayah_surah_name": ayah["surah"]["name"],
-                    "ayah_surah_number": int(ayah["surah"]["number"]),
-                    "ayah_page_number": int(ayah["page"]),
-                    "ayah_ruku_number": int(ayah["ruku"]),
-                    "ayah_hizbQuarter_number": int(ayah["hizbQuarter"]),
-                    "ayah_is_sajda": ayah["sajda"],
-                },
-            }
-        )
-
+        bulk_data.append(prepare_ayah_document(edition=edition, index_name=index_name, ayah=ayah))
     try:
         # Use the bulk helper to perform bulk insertion
         _, failed = bulk(es, bulk_data, raise_on_error=False)
-        if failed:
-            # Log details of failed documents
-            for _ in failed:
-                handle_error(message="Failed to index", url=url)
+        return failed
     except BulkIndexError as err:
         raise err
+
+
+def prepare_ayah_document(edition, index_name, ayah):
+    return {
+        "_op_type": "index",
+        "_index": index_name,
+        "_id": str(ayah["number"]),
+        "_source": {
+            "edition_identifier": edition["identifier"],
+            "edition_name_in_arabic": edition["name"],
+            "ayah_text": ayah["text"],
+            "ayah_number_in_surah": int(ayah["numberInSurah"]),
+            "ayah_number_in_quran": int(ayah["number"]),
+            "ayah_surah_name": ayah["surah"]["name"],
+            "ayah_surah_number": int(ayah["surah"]["number"]),
+            "ayah_page_number": int(ayah["page"]),
+            "ayah_ruku_number": int(ayah["ruku"]),
+            "ayah_hizbQuarter_number": int(ayah["hizbQuarter"]),
+            "ayah_is_sajda": ayah["sajda"],
+        },
+    }
 
 
 def handle_error(message, url, error: None):
