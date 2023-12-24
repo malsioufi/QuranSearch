@@ -34,11 +34,9 @@ def get_and_index_edition_data(edition, es, index_name):
         try:
             get_and_index_page_data(edition, es, index_name, page_number, url)
         except BulkIndexError as err:
-            handle_error(
-                "Error during bulk indexing", 500, edition, page_number, url, err
-            )
+            handle_error(message="Error during bulk indexing", url=url, error=err)
         except Exception:
-            handle_error("Failed to fetch page", edition, page_number, url)
+            handle_error(message="Failed to fetch page", url=url)
 
 
 def get_and_index_page_data(edition, es, index_name, page_number, url):
@@ -55,7 +53,7 @@ def get_and_index_page_data(edition, es, index_name, page_number, url):
                 url,
             )
         else:
-            handle_error("Ayahs not found", 404, edition, page_number, url)
+            handle_error(message="Ayahs not found", url=url)
     else:
         raise Exception
 
@@ -93,18 +91,17 @@ def index_ayahs(ayahs, edition, es, index_name, page_number, url):
         if failed:
             # Log details of failed documents
             for _ in failed:
-                handle_error("Failed to index", 500, edition, page_number, url)
+                handle_error(message="Failed to index", url=url)
     except BulkIndexError as err:
         raise err
 
 
-def handle_error(message, status_code, edition, page_number, url, error: None):
+def handle_error(message, url, error: None):
     """
     Handle errors during data fetching.
     """
-    logger.error(
-        f"{message} {page_number} for {edition['identifier']}. Status code: {status_code}"
-    )
+    logger.error(f"{message} for {url}")
+    logger.error(error)
     logger.info(url)
 
 
@@ -123,10 +120,7 @@ def process_edition(edition, es):
 
     except Exception as err:
         handle_error(
-            "An error occurred in process_arabic_edition",
-            500,
-            edition,
-            0,
-            f"index_name:{index_name}",
-            err,
+            message="An error occurred in process_arabic_edition",
+            url=f"index_name:{index_name}",
+            error=err,
         )
