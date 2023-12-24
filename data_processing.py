@@ -1,5 +1,5 @@
 import requests
-from config import INDEX_PREFIX, MAX_PAGES
+from config import INDEX_PREFIX, NUMBER_OF_PAGES_IN_QURAN
 from elasticsearch_service import Ayah
 from elasticsearch.helpers import bulk, BulkIndexError
 
@@ -29,7 +29,7 @@ def fetch_and_process_data(edition, es, index_name):
     """
     base_url = f"http://api.alquran.cloud/v1/page/{{}}/{edition['identifier']}"
 
-    for page_number in range(1, MAX_PAGES + 1):
+    for page_number in range(1, NUMBER_OF_PAGES_IN_QURAN + 1):
         url = base_url.format(page_number)
         response = requests.get(url)
 
@@ -84,14 +84,14 @@ def process_page_data(page_data, edition, es, index_name, page_number, url):
                 # Log details of failed documents
                 for doc in failed:
                     handle_error("Failed to index", 500, edition, page_number, url)
-        except BulkIndexError:
+        except BulkIndexError as err:
             # Log the overall bulk indexing error
-            handle_error("Error during bulk indexing", 500, edition, page_number, url)
+            handle_error("Error during bulk indexing", 500, edition, page_number, url, err)
     else:
         handle_error("Ayahs not found", 404, edition, page_number, url)
 
 
-def handle_error(message, status_code, edition, page_number, url):
+def handle_error(message, status_code, edition, page_number, url, error: None):
     """
     Handle errors during data fetching.
     """
@@ -113,6 +113,5 @@ def process_arabic_edition(edition, es):
 
         fetch_and_process_data(edition, es, index_name)
 
-    except Exception as e:
-        logger.exception(f"An error occurred: {str(e)}")
-        handle_error("An error occurred in process_arabic_edition", 500, edition, 0, f"index_name:{index_name}")
+    except Exception as err:
+        handle_error("An error occurred in process_arabic_edition", 500, edition, 0, f"index_name:{index_name}", err)
