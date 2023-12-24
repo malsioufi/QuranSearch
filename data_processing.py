@@ -16,7 +16,7 @@ def create_index(index_name, es):
     logger.info(f"Created index: {index_name}")
 
 
-def delete_existing_index(index_name, es):
+def delete_index(index_name, es):
     """
     Delete an existing index with the specified name.
     """
@@ -117,7 +117,7 @@ def process_edition(edition):
         es = configure_elasticsearch()
         index_name = INDEX_PREFIX + edition["identifier"]
 
-        delete_existing_index(index_name=index_name, es=es)
+        delete_index(index_name=index_name, es=es)
         create_index(index_name=index_name, es=es)
 
         get_and_index_edition_data(edition=edition, es=es, index_name=index_name)
