@@ -23,7 +23,6 @@ def main():
     if args.rerun:
         # Rerun mode
         rerun_failed_links(args.links_list)
-        pass
 
     else:
         arabic_editions = fetch_arabic_editions()

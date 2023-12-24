@@ -1,6 +1,6 @@
 import re
 import requests
-from config import INDEX_PREFIX, NUMBER_OF_PAGES_IN_QURAN
+from config import INDEX_PREFIX, NUMBER_OF_SECTIONS
 from elasticsearch_service import Ayah, configure_elasticsearch
 from elasticsearch.helpers import bulk, BulkIndexError
 
@@ -25,22 +25,24 @@ def delete_existing_index(index_name, es):
         logger.info(f"Deleted existing index: {index_name}")
 
 
-def get_and_index_edition_data(edition, es, index_name):
-    base_url = f"http://api.alquran.cloud/v1/page/{{}}/{edition['identifier']}"
+def get_and_index_edition_data(edition, es, index_name, section="juz"):
+    number_of_sections = NUMBER_OF_SECTIONS[section]
+    base_url = f"http://api.alquran.cloud/v1/{section}/{{}}/{edition['identifier']}"
 
-    for page_number in range(1, NUMBER_OF_PAGES_IN_QURAN + 1):
-        url = base_url.format(page_number)
+    for section_number in range(1, number_of_sections + 1):
+        url = base_url.format(section_number)
         try:
-            get_and_index_page_data_from_url(
+            get_and_index_section_data_from_url(
                 edition=edition, es=es, index_name=index_name, url=url
             )
         except BulkIndexError as err:
             handle_error(message="Error during bulk indexing", url=url, error=err)
-        except Exception:
-            handle_error(message="Failed to fetch page", url=url)
+        except Exception as err:
+            handle_error(message="Failed to fetch page", url=url, error=err)
 
 
-def get_and_index_page_data_from_url(edition, es, index_name, url):
+def get_and_index_section_data_from_url(edition, es, index_name, url):
+    print(f"Getting data from {url}")
     response = requests.get(url)
     if response.status_code == 200:
         ayahs = response.json().get("data", {}).get("ayahs", [])
@@ -87,6 +89,8 @@ def prepare_ayah_document(edition, index_name, ayah):
             "ayah_number_in_surah": int(ayah["numberInSurah"]),
             "ayah_number_in_quran": int(ayah["number"]),
             "ayah_surah_name": ayah["surah"]["name"],
+            "ayah_juz_number": int(ayah["juz"]),
+            "ayah_manzil_number": int(ayah["manzil"]),
             "ayah_surah_number": int(ayah["surah"]["number"]),
             "ayah_page_number": int(ayah["page"]),
             "ayah_ruku_number": int(ayah["ruku"]),
@@ -164,4 +168,4 @@ def rerun_failed_links(links_list_path):
             None,
         )
         index_name = INDEX_PREFIX + edition_identifier
-        get_and_index_page_data_from_url(edition, es, index_name, url)
+        get_and_index_section_data_from_url(edition, es, index_name, url)

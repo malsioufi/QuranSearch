@@ -22,6 +22,8 @@ class Ayah(Document):
     ayah_surah_number = Integer()
     ayah_page_number = Integer()
     ayah_ruku_number = Integer()
+    ayah_juz_number = Integer()
+    ayah_manzil_number = Integer()
     ayah_hizbQuarter_number = Integer()
 
     ayah_is_sajda = Object(
